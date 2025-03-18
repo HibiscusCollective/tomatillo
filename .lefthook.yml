@@ -1,0 +1,24 @@
+assert_lefthook_installed: true
+
+post-merge:
+    piped: true
+    jobs:
+        - name: Mise update
+          id: mise-update
+          run: mise install
+          interactive: true
+
+pre-commit:
+    piped: true
+    jobs:
+        - name: 'Run formatters'
+          run: mise run fmt
+          stage_fixed: true
+        - name: 'Run linters'
+          run: mise run lint
+
+commit-msg:
+    piped: true
+    jobs:
+      - name: 'Run commit linter'
+        run: bun run commitlint --edit {1}

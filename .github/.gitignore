@@ -1,0 +1,10 @@
+## Allow workflows
+!workflows/
+!workflows/*.yaml
+
+## Allow renovate config
+!renovate.config.js
+!renovate.json
+
+## Allow github config files
+!CODEOWNERS

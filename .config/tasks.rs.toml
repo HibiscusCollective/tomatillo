@@ -1,0 +1,15 @@
+["fmt:rustfmt"]
+description = "Format code with rustfmt"
+run = "cargo fmt --all -- --config-path {{vars.config_dir}}"
+
+["lint:clippy"]
+description = "Lint code with clippy"
+run = "cargo clippy --no-deps --all"
+
+["lint:rustfmt"]
+description = "Lint code with rustfmt"
+run = "cargo fmt --all --check -- --config-path {{vars.config_dir}}"
+
+["fix:clippy"]
+description = "Fix code with clippy"
+run = "cargo clippy --no-deps --all --fix"

@@ -1,0 +1,12 @@
+avoid-breaking-exported-api = false
+doc-valid-idents = ["OS", "GUI"]
+disallowed-names = [
+    "foo",
+    "bar",
+    "baz",
+    "quux",
+    "util",
+    "utils",
+    "tool",
+    "tools",
+]

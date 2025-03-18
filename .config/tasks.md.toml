@@ -1,0 +1,17 @@
+["fmt:markdownlint"]
+description = "Format markdown files"
+usage = 'arg "<file>" var=#true default="**/*.md"'
+quiet = true
+run = 'mise run lint:markdownlint {{arg(name="file")}} --fix'
+
+["lint:markdownlint"]
+description = "Lint markdown files"
+usage = 'arg "<file>" var=#true default="**/*.md"'
+quiet = true
+run = 'markdownlint-cli2 --config {{vars.config_dir}}/.markdownlint-cli2.jsonc {{arg(name="file")}}'
+
+["fix:markdownlint"]
+description = "Fix markdown files"
+usage = 'arg "<file>" var=#true default="**/*.md"'
+quiet = true
+run = 'mise run fmt:markdownlint {{arg(name="file")}} --fix'

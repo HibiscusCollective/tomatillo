@@ -1,0 +1,34 @@
+[tools]
+lefthook = "1.11.3"
+markdownlint-cli2 = "0.17.2"
+gh = "2.68.1"
+bun = "1.2.5"
+
+[task_config]
+includes = [
+  ".config/tasks.md.toml",
+  ".config/tasks.rs.toml",
+  ".config/tasks.ts.toml",
+]
+
+[vars]
+config_dir = "{{config_root}}/.config"
+
+[env]
+CLIPPY_CONF_DIR = "{{vars.config_dir}}"
+
+[tasks.fmt]
+description = "Run all formatting tasks"
+depends = ["fmt:*"]
+
+[tasks.lint]
+description = "Run all linting tasks"
+depends = ["lint:*"]
+
+[tasks.fix]
+description = "Fix all linting problems"
+depends = ["fix:*"]
+
+[tasks."lint:spellcheck"]
+description = "Run spell check"
+run = "bun spellcheck"

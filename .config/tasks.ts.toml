@@ -1,0 +1,17 @@
+["fmt:prettier:ts"]
+description = "Run prettier on typescript files"
+usage = "arg '[files]' #var=true default='**/*.{ts,tsx,cts,mts,d.ts,d.mts,d.cts}'"
+sources = ["**/*.{ts,tsx,cts,mts,d.ts,d.mts,d.cts}"]
+run = "bun fmt {{arg(name='files')}}"
+
+["lint:eslint:ts"]
+description = "Run eslint on typescript files"
+usage = "arg '[files]' #var=true default='**/*.{ts,tsx,cts,mts,d.ts,d.mts,d.cts}'"
+sources = ["**/*.{ts,tsx,cts,mts,d.ts,d.mts,d.cts}"]
+run = "bun lint {{arg(name='files')}}"
+
+["fix:eslint:ts"]
+description = "Run eslint on typescript files"
+usage = "arg '[files]' #var=true default='**/*.{ts,tsx,cts,mts,d.ts,d.mts,d.cts}'"
+sources = ["**/*.{ts,tsx,cts,mts,d.ts,d.mts,d.cts}"]
+run = "bun fix {{arg(name='files')}}"
