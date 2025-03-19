@@ -2,16 +2,16 @@ use std::sync::Arc;
 
 use tokio::{
     sync::{
-        Mutex,
-        watch::{self, Receiver, Sender},
+        watch::{self, Receiver, Sender}, Mutex
     },
-    time::{self, Duration, Interval},
+    time::{self, Duration, Instant, Interval},
 };
 
 /// A timer that counts down from a specified duration.
 pub struct Timer {
     remaining: Arc<Mutex<Duration>>,
     interval: Mutex<Interval>,
+    last_tick: Mutex<Instant>,
     tx: Sender<Duration>,
 }
 
@@ -40,6 +40,7 @@ impl Timer {
         Self {
             remaining: Arc::new(Mutex::new(duration)),
             interval: Mutex::new(time::interval(interval)),
+            last_tick: Mutex::new(Instant::now()),
             tx,
         }
     }
@@ -47,23 +48,30 @@ impl Timer {
     /// Starts the countdown.
     pub async fn countdown(&mut self) {
         while !self.remaining.lock().await.is_zero() {
-            self.interval.lock().await.tick().await;
+            let instant = self.interval.lock().await.tick().await;
+            let delta = self.delta(instant).await;
+
             let rem = self
                 .remaining
                 .lock()
                 .await
-                .checked_sub(Duration::from_millis(100))
+                .checked_sub(delta)
                 .unwrap(); // TODO: Handle errors
 
             self.tx.send(rem).unwrap(); // TODO: Handle errors
 
             *self.remaining.lock().await = rem;
+            *self.last_tick.lock().await = instant;
         }
     }
 
     /// Watches the remaining time.
     pub fn watch(&self) -> Receiver<Duration> {
         self.tx.subscribe()
+    }
+
+    async fn delta(&self, instant: Instant) -> Duration {
+        instant.duration_since(*self.last_tick.lock().await)
     }
 }
 
@@ -95,9 +103,10 @@ mod tests {
 
         let countdown_handle = timer.countdown();
         let watch_handle = tokio::spawn(async move {
-            for expect in expectations.iter() {
-                assert_eq!(expect.as_millis(), rx.borrow_and_update().as_millis());
+            for (i, expect) in expectations.iter().enumerate() {
                 rx.changed().await.unwrap();
+                let actual = rx.borrow_and_update().as_millis();
+                assert_eq!(expect.as_millis(), actual,  "Interval {} expected {}, but got {}", i, expect.as_millis(), actual);
             }
         });
 
