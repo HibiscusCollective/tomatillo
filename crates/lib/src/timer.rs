@@ -1,18 +1,42 @@
 use std::sync::Arc;
 
 use tokio::{
-    sync::{Mutex, mpsc::Sender},
+    sync::{
+        Mutex,
+        watch::{self, Receiver, Sender},
+    },
     time::{self, Duration, Interval},
 };
 
+/// A timer that counts down from a specified duration.
 pub struct Timer {
     remaining: Arc<Mutex<Duration>>,
     interval: Mutex<Interval>,
     tx: Sender<Duration>,
 }
 
+impl Default for Timer {
+    fn default() -> Self {
+        let default_duration = Duration::from_secs(25 * 60);
+        let default_interval = Duration::from_secs(1);
+
+        Self::new(default_duration, default_interval)
+    }
+}
+
 impl Timer {
-    pub fn new(duration: Duration, interval: Duration, tx: Sender<Duration>) -> Self {
+    /// Creates a new [`Timer`].
+    ///
+    /// # Arguments
+    ///
+    /// * `duration` - The duration of the timer.
+    /// * `interval` - The interval at which the timer should be updated.
+    ///
+    /// # Returns
+    ///
+    /// A new [`Timer`].
+    pub fn new(duration: Duration, interval: Duration) -> Self {
+        let (tx, _) = watch::channel(duration);
         Self {
             remaining: Arc::new(Mutex::new(duration)),
             interval: Mutex::new(time::interval(interval)),
@@ -20,6 +44,7 @@ impl Timer {
         }
     }
 
+    /// Starts the countdown.
     pub async fn countdown(&mut self) {
         while !self.remaining.lock().await.is_zero() {
             self.interval.lock().await.tick().await;
@@ -28,12 +53,17 @@ impl Timer {
                 .lock()
                 .await
                 .checked_sub(Duration::from_millis(100))
-                .unwrap();
+                .unwrap(); // TODO: Handle errors
 
-            self.tx.send(rem).await.unwrap();
+            self.tx.send(rem).unwrap(); // TODO: Handle errors
 
             *self.remaining.lock().await = rem;
         }
+    }
+
+    /// Watches the remaining time.
+    pub fn watch(&self) -> Receiver<Duration> {
+        self.tx.subscribe()
     }
 }
 
@@ -46,10 +76,11 @@ mod tests {
 
     #[tokio::test]
     async fn should_countdown_to_zero() {
-        let (tx, mut rx) = tokio::sync::mpsc::channel::<Duration>(2);
+        let mut timer = Timer::new(Duration::from_secs(1), Duration::from_millis(100));
+        let mut rx = timer.watch();
 
-        let mut timer = Timer::new(Duration::from_secs(1), Duration::from_millis(100), tx);
-        let expect = Mutex::new(VecDeque::from([
+        let expectations = VecDeque::from([
+            Duration::from_secs(1),
             Duration::from_millis(900),
             Duration::from_millis(800),
             Duration::from_millis(700),
@@ -60,17 +91,17 @@ mod tests {
             Duration::from_millis(200),
             Duration::from_millis(100),
             Duration::from_millis(0),
-        ]));
+        ]);
 
-        tokio::spawn(async move {
-            while let Some(rem) = rx.recv().await {
-                assert_eq!(
-                    rem.as_millis(),
-                    expect.lock().await.pop_front().unwrap().as_millis()
-                );
+        let countdown_handle = timer.countdown();
+        let watch_handle = tokio::spawn(async move {
+            for expect in expectations.iter() {
+                assert_eq!(expect.as_millis(), rx.borrow_and_update().as_millis());
+                rx.changed().await.unwrap();
             }
         });
 
-        timer.countdown().await;
+        countdown_handle.await;
+        watch_handle.abort();
     }
 }
