@@ -8,10 +8,10 @@ use tokio::{sync::watch::Receiver, time::Duration};
 
 pub mod timer;
 
-pub async fn run(writer: Arc<RwLock<impl Write + Send + Sync + 'static>>, mut timer: timer::Timer) {
+pub async fn run(writer: Arc<RwLock<impl Write + Send + Sync + 'static>>, mut timer: timer::Countdown) {
     let rx = timer.watch();
     let wr = writer.clone();
-    let countdown_handle = timer.countdown();
+    let countdown_handle = timer.start();
     let watch_handle: tokio::task::JoinHandle<()> =
         tokio::spawn(async move { update_display(wr, rx).await });
 
@@ -43,7 +43,7 @@ mod tests {
 
     #[tokio::test]
     async fn should_display_countdown_as_it_changes() {
-        let timer = timer::Timer::new(Duration::from_secs(5), Duration::from_secs(1));
+        let timer = timer::Countdown::new(Duration::from_secs(5), Duration::from_secs(1));
 
         let expectations: &str = "00:05\r00:04\r00:03\r00:02\r00:01\r00:00\r";
 
