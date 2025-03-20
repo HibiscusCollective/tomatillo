@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use tokio::{
     sync::{
-        watch::{self, Receiver, Sender}, Mutex
+        Mutex,
+        watch::{self, Receiver, Sender},
     },
     time::{self, Duration, Instant, Interval},
 };
@@ -51,12 +52,7 @@ impl Timer {
             let instant = self.interval.lock().await.tick().await;
             let delta = self.delta(instant).await;
 
-            let rem = self
-                .remaining
-                .lock()
-                .await
-                .checked_sub(delta)
-                .unwrap(); // TODO: Handle errors
+            let rem = self.remaining.lock().await.checked_sub(delta).unwrap(); // TODO: Handle errors
 
             self.tx.send(rem).unwrap(); // TODO: Handle errors
 
@@ -77,7 +73,6 @@ impl Timer {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::VecDeque;
     use tokio::time::Duration;
 
     use super::*;
@@ -87,26 +82,24 @@ mod tests {
         let mut timer = Timer::new(Duration::from_secs(1), Duration::from_millis(100));
         let mut rx = timer.watch();
 
-        let expectations = VecDeque::from([
-            Duration::from_secs(1),
-            Duration::from_millis(900),
-            Duration::from_millis(800),
-            Duration::from_millis(700),
-            Duration::from_millis(600),
-            Duration::from_millis(500),
-            Duration::from_millis(400),
-            Duration::from_millis(300),
-            Duration::from_millis(200),
-            Duration::from_millis(100),
-            Duration::from_millis(0),
-        ]);
+        let expectations = [
+            1000u16, 900u16, 800u16, 700u16, 600u16, 500u16, 400u16, 300u16, 200u16, 100u16, 0u16,
+        ]
+        .map(|ms| Duration::from_millis(ms.into()));
 
         let countdown_handle = timer.countdown();
         let watch_handle = tokio::spawn(async move {
             for (i, expect) in expectations.iter().enumerate() {
                 rx.changed().await.unwrap();
                 let actual = rx.borrow_and_update().as_millis();
-                assert_eq!(expect.as_millis(), actual,  "Interval {} expected {}, but got {}", i, expect.as_millis(), actual);
+                assert_eq!(
+                    expect.as_millis(),
+                    actual,
+                    "Interval {} expected {}, but got {}",
+                    i,
+                    expect.as_millis(),
+                    actual
+                );
             }
         });
 
