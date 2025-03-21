@@ -12,6 +12,8 @@ pub enum InvalidCountdown {
     IntervalGreaterThanDuration{duration: DurationDisplay, interval: DurationDisplay},
     #[error("Duration cannot be zero")]
     ZeroDuration,
+    #[error("Interval cannot be zero")]
+    ZeroInterval,
 }
 
 /// A timer that counts down from a specified duration.
@@ -58,6 +60,10 @@ impl Countdown {
             return Err(InvalidCountdown::ZeroDuration);
         }
 
+        if interval.is_zero() {
+            return Err(InvalidCountdown::ZeroInterval);
+        }
+
         if interval > duration {
             return Err(InvalidCountdown::IntervalGreaterThanDuration{duration: DurationDisplay(duration), interval: DurationDisplay(interval)});
         }
@@ -99,6 +105,12 @@ mod tests {
     fn should_fail_to_create_a_countdown_given_a_duration_of_zero() {
         let result = Countdown::try_new(Duration::from_secs(0), Duration::from_millis(100));
         assert_eq!(result.expect_err("should have failed"), InvalidCountdown::ZeroDuration);
+    }
+
+    #[test]
+    fn should_fail_to_create_a_countdown_given_an_interval_of_zero() {
+        let result = Countdown::try_new(Duration::from_secs(1), Duration::from_millis(0));
+        assert_eq!(result.expect_err("should have failed"), InvalidCountdown::ZeroInterval);
     }
 
     #[tokio::test]
