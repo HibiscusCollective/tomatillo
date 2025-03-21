@@ -1,21 +1,43 @@
+use std::fmt::{Display, Formatter};
+
+use thiserror::Error;
 use tokio::{
     sync::broadcast::{self, Receiver, Sender},
     time::{self, Duration, Interval},
 };
 
+#[derive(Debug, Error, PartialEq)]
+pub enum InvalidCountdown {
+    #[error("Interval {interval} cannot be greater than duration {duration}")]
+    IntervalGreaterThanDuration{duration: DurationDisplay, interval: DurationDisplay},
+    #[error("Duration cannot be zero")]
+    ZeroDuration,
+}
+
 /// A timer that counts down from a specified duration.
+#[derive(Debug)]
 pub struct Countdown {
     duration: Duration,
     interval: Interval,
     time_left_tx: Sender<Duration>,
 }
 
+/// Wraps a [`Duration`], formatting it as `HH:MM:SS`.
+#[derive(Debug, PartialEq)]
+pub struct DurationDisplay(Duration);
+
 impl Default for Countdown {
     fn default() -> Self {
         let default_duration = Duration::from_secs(25 * 60);
         let default_interval = Duration::from_secs(1);
 
-        Self::new(default_duration, default_interval)
+        Self::try_new(default_duration, default_interval).expect("failed to create default timer")
+    }
+}
+
+impl Display for DurationDisplay {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:02}:{:02}:{:02}", self.0.as_secs() / 3600, (self.0.as_secs() / 60) % 60, self.0.as_secs() % 60)
     }
 }
 
@@ -30,11 +52,18 @@ impl Countdown {
     /// # Returns
     ///
     /// A new [`Timer`].
-    pub fn new(duration: Duration, interval: Duration) -> Self {
+    pub fn try_new(duration: Duration, interval: Duration) -> Result<Self, InvalidCountdown> {
         // TODO: Validate inputs. Fail if interval > duration || interval == 0 || duration cannot be more than 1 day (86_400_000ms) u32
+        if duration.is_zero() {
+            return Err(InvalidCountdown::ZeroDuration);
+        }
+
+        if interval > duration {
+            return Err(InvalidCountdown::IntervalGreaterThanDuration{duration: DurationDisplay(duration), interval: DurationDisplay(interval)});
+        }
 
         let (time_left_tx, _) = broadcast::channel::<Duration>(1);
-        Self { interval: time::interval(interval), time_left_tx, duration }
+        Ok(Self { interval: time::interval(interval), time_left_tx, duration })
     }
 
     /// Starts the countdown.
@@ -60,9 +89,21 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn should_fail_to_create_a_countdown_given_an_interval_greater_than_the_duration() {
+        let result = Countdown::try_new(Duration::from_secs(1), Duration::from_secs(2));
+        assert_eq!(result.expect_err("should have failed"), InvalidCountdown::IntervalGreaterThanDuration{duration: DurationDisplay(Duration::from_secs(1)), interval: DurationDisplay(Duration::from_secs(2))});
+    }
+
+    #[test]
+    fn should_fail_to_create_a_countdown_given_a_duration_of_zero() {
+        let result = Countdown::try_new(Duration::from_secs(0), Duration::from_millis(100));
+        assert_eq!(result.expect_err("should have failed"), InvalidCountdown::ZeroDuration);
+    }
+
     #[tokio::test]
     async fn should_countdown_to_zero() {
-        let mut timer = Countdown::new(Duration::from_secs(1), Duration::from_millis(100));
+        let mut timer = Countdown::try_new(Duration::from_secs(1), Duration::from_millis(100)).expect("should have created countdown");
         let mut rx = timer.watch();
 
         let expectations = [
@@ -76,21 +117,6 @@ mod tests {
                 let actual = rx.recv().await.expect("Failed to receive duration").as_millis();
                 assert_eq!(expect.as_millis(), actual, "Interval {} expected {}, but got {}", i, expect.as_millis(), actual);
             }
-        });
-
-        countdown_handle.await;
-        watch_handle.abort();
-    }
-
-    #[tokio::test]
-    async fn should_not_countdown_if_duration_is_zero() {
-        let mut timer = Countdown::new(Duration::from_secs(0), Duration::from_millis(100));
-        let mut rx = timer.watch();
-
-        let countdown_handle = timer.start();
-        let watch_handle = tokio::spawn(async move {
-            let actual = rx.recv().await.expect("Failed to receive duration").as_millis();
-            assert_eq!(0u128, actual);
         });
 
         countdown_handle.await;
