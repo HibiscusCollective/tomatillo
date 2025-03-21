@@ -87,8 +87,6 @@ impl Countdown {
     }
 }
 
-
-
 fn validate_duration(duration: Duration) -> Result<(), InvalidCountdown> {
     if duration.is_zero() {
         return Err(InvalidCountdown::ZeroDuration);
