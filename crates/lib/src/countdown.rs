@@ -1,10 +1,18 @@
 use std::fmt::{Display, Formatter};
-
 use thiserror::Error;
 use tokio::{
     sync::broadcast::{self, Receiver, Sender},
     time::{self, Duration, Interval},
 };
+use tokio::sync::broadcast::error::SendError;
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error(transparent)]
+    InvalidCountdown(#[from] InvalidCountdown),
+    #[error(transparent)]
+    CountdownError(#[from] SendError<Duration>)
+}
 
 #[derive(Debug, Error, PartialEq)]
 pub enum InvalidCountdown {
@@ -20,7 +28,7 @@ pub enum InvalidCountdown {
     IntervalGreaterThanOneHour(DurationDisplay),
 }
 
-/// A timer that counts down from a specified duration.
+/// A countdown that counts down from a specified duration.
 #[derive(Debug)]
 pub struct Countdown {
     duration: Duration,
@@ -77,7 +85,7 @@ impl Countdown {
         for i in (0..=intervals).rev() {
             self.interval.tick().await;
 
-            self.time_left_tx.send(self.interval.period() * i).unwrap(); // TODO: Handle failed send
+            self.time_left_tx.send(self.interval.period() * i);
         }
     }
 
@@ -113,7 +121,9 @@ fn validate_interval(interval: Duration) -> Result<(), InvalidCountdown> {
 
 #[cfg(test)]
 mod tests {
-    use tokio::time::Duration;
+    use std::sync::Arc;
+
+    use tokio::{sync::Mutex, time::Duration};
 
     use super::*;
 
@@ -148,16 +158,40 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn should_skip_a_tick_when_the_new_duration_could_not_be_sent() {
+        time::pause();
+        let timer = Arc::new(Mutex::new(Countdown::try_new(Duration::from_millis(500), Duration::from_millis(100)).expect("should have created countdown")));
+
+        let counter = timer.clone();
+        let countdown_handle = tokio::spawn(async move {
+            counter.lock().await.start().await;
+        });
+
+        let watch_handle = tokio::spawn(async move {
+            let mut rx = timer.lock().await.watch();
+            for (i, expect) in [200u128, 100u128, 0u128].iter().cloned().enumerate() {
+                let actual = rx.recv().await.expect("Failed to receive duration").as_millis();
+                assert_eq!(expect, actual, "Interval {} expected {}, but got {}", i, expect, actual);
+            }
+        });
+
+        time::advance(Duration::from_millis(300)).await;
+        time::resume();
+        
+        countdown_handle.await.expect("countdown task failed");
+        watch_handle.abort();
+    }
+
+    #[tokio::test]
     async fn should_countdown_to_zero() {
         let mut timer = Countdown::try_new(Duration::from_secs(1), Duration::from_millis(100)).expect("should have created countdown");
         let mut rx = timer.watch();
 
-        let expectations = [
-            1000u16, 900u16, 800u16, 700u16, 600u16, 500u16, 400u16, 300u16, 200u16, 100u16, 0u16,
-        ]
-        .map(|ms| Duration::from_millis(ms.into()));
+        let expectations = [1000u16, 900u16, 800u16, 700u16, 600u16, 500u16, 400u16, 300u16, 200u16, 100u16, 0u16].map(|ms| Duration::from_millis(ms.into()));
 
-        let countdown_handle = timer.start();
+        let countdown_handle = tokio::spawn(async move {
+            timer.start().await;
+        });
         let watch_handle = tokio::spawn(async move {
             for (i, expect) in expectations.iter().enumerate() {
                 let actual = rx.recv().await.expect("Failed to receive duration").as_millis();
@@ -165,7 +199,7 @@ mod tests {
             }
         });
 
-        countdown_handle.await;
+        countdown_handle.await.expect("unexpected error in countdown");
         watch_handle.abort();
     }
 }
