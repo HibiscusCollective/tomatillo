@@ -59,25 +59,11 @@ impl Countdown {
     ///
     /// A new [`Timer`].
     pub fn try_new(duration: Duration, interval: Duration) -> Result<Self, InvalidCountdown> {
-        // TODO: Validate inputs. Fail if interval > duration || interval == 0 || duration cannot be more than 1 day (86_400_000ms) u32
-        if duration.is_zero() {
-            return Err(InvalidCountdown::ZeroDuration);
-        }
-
-        if interval.is_zero() {
-            return Err(InvalidCountdown::ZeroInterval);
-        }
+        validate_duration(duration)?;
+        validate_interval(interval)?;
 
         if interval > duration {
             return Err(InvalidCountdown::IntervalGreaterThanDuration{duration: DurationDisplay(duration), interval: DurationDisplay(interval)});
-        }
-
-        if duration > Duration::from_secs(86_400) {
-            return Err(InvalidCountdown::DurationGreaterThanOneDay(DurationDisplay(duration)));
-        }
-
-        if interval > Duration::from_secs(3600) {
-            return Err(InvalidCountdown::IntervalGreaterThanOneHour(DurationDisplay(interval)));
         }
 
         let (time_left_tx, _) = broadcast::channel::<Duration>(1);
@@ -99,6 +85,32 @@ impl Countdown {
     pub fn watch(&self) -> Receiver<Duration> {
         self.time_left_tx.subscribe()
     }
+}
+
+
+
+fn validate_duration(duration: Duration) -> Result<(), InvalidCountdown> {
+    if duration.is_zero() {
+        return Err(InvalidCountdown::ZeroDuration);
+    }
+
+    if duration > Duration::from_secs(86_400) {
+        return Err(InvalidCountdown::DurationGreaterThanOneDay(DurationDisplay(duration)));
+    }
+
+    Ok(())
+}
+
+fn validate_interval(interval: Duration) -> Result<(), InvalidCountdown> {
+    if interval.is_zero() {
+        return Err(InvalidCountdown::ZeroInterval);
+    }
+
+    if interval > Duration::from_secs(3600) {
+        return Err(InvalidCountdown::IntervalGreaterThanOneHour(DurationDisplay(interval)));
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
