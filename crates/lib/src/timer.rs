@@ -14,6 +14,10 @@ pub enum InvalidCountdown {
     ZeroDuration,
     #[error("Interval cannot be zero")]
     ZeroInterval,
+    #[error("Duration {0} cannot be greater than one day")]
+    DurationGreaterThanOneDay(DurationDisplay),
+    #[error("Interval {0} cannot be greater than one hour")]
+    IntervalGreaterThanOneHour(DurationDisplay),
 }
 
 /// A timer that counts down from a specified duration.
@@ -68,6 +72,14 @@ impl Countdown {
             return Err(InvalidCountdown::IntervalGreaterThanDuration{duration: DurationDisplay(duration), interval: DurationDisplay(interval)});
         }
 
+        if duration > Duration::from_secs(86_400) {
+            return Err(InvalidCountdown::DurationGreaterThanOneDay(DurationDisplay(duration)));
+        }
+
+        if interval > Duration::from_secs(3600) {
+            return Err(InvalidCountdown::IntervalGreaterThanOneHour(DurationDisplay(interval)));
+        }
+
         let (time_left_tx, _) = broadcast::channel::<Duration>(1);
         Ok(Self { interval: time::interval(interval), time_left_tx, duration })
     }
@@ -111,6 +123,18 @@ mod tests {
     fn should_fail_to_create_a_countdown_given_an_interval_of_zero() {
         let result = Countdown::try_new(Duration::from_secs(1), Duration::from_millis(0));
         assert_eq!(result.expect_err("should have failed"), InvalidCountdown::ZeroInterval);
+    }
+
+    #[test]
+    fn should_fail_to_create_a_countdown_given_a_duration_of_greater_than_one_day() {
+        let result = Countdown::try_new(Duration::from_secs(86_401), Duration::from_millis(100));
+        assert_eq!(result.expect_err("should have failed"), InvalidCountdown::DurationGreaterThanOneDay(DurationDisplay(Duration::from_secs(86_401))));
+    }
+
+    #[test]
+    fn should_fail_to_create_a_countdown_given_an_interval_of_greater_than_one_hour() {
+        let result = Countdown::try_new(Duration::from_secs(86_400), Duration::from_secs(3601));
+        assert_eq!(result.expect_err("should have failed"), InvalidCountdown::IntervalGreaterThanOneHour(DurationDisplay(Duration::from_secs(3601))));
     }
 
     #[tokio::test]
