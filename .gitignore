@@ -68,6 +68,7 @@
 !crates/cli
 !crates/os
 !crates/**/src
+!crates/**/*/
 !crates/**/testdata
 
 !crates/**/testdata/*.tar.gz

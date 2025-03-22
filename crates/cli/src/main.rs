@@ -1,12 +1,12 @@
-use std::{sync::{Arc, RwLock}, time::Duration};
+use tokio::time::Duration;
 
-use libtomatillo::{run, timer};
+use libtomatillo::{run, countdown};
 use std::io::stdout;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() {
-    let timer = timer::Countdown::new(Duration::from_secs(25), Duration::from_secs(1));
-    let writer = Arc::new(RwLock::new(stdout()));
-    
-    run(writer, timer).await;
+    let timer = countdown::Countdown::try_new(Duration::from_secs(25)).expect("failed to create timer");
+
+    run(stdout(), timer).await;
 }
+
