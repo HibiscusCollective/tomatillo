@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{ops::Mul, sync::Arc};
 
 use thiserror::Error;
 use tokio::{
@@ -29,7 +29,7 @@ pub enum InvalidDuration {
     #[error("Duration {0:?} cannot be greater than one day")]
     DurationGreaterThanOneDay(Duration),
     #[error("Duration {duration:?} cannot be smaller than period {period:?}")]
-    DurationSmallerThanInterval{duration: Duration, period: Duration},
+    DurationSmallerThanPeriod{duration: Duration, period: Duration},
 }
 
 /// A countdown that counts down from a specified duration.
@@ -51,7 +51,7 @@ impl Default for Countdown {
 }
 
 impl Countdown {
-    /// Creates a new [`Countdown`].
+    /// Creates a new [`Countdown`] timer.
     ///
     /// # Arguments
     ///
@@ -59,9 +59,12 @@ impl Countdown {
     ///
     /// # Returns
     ///
-    /// A new [`Countdown`].
+    /// A [`Result`] that is:
+    ///
+    /// * `Ok(timer)` - The countdown timer has been created.
+    /// * `Err(err)` - The countdown timer could not be created.
     pub fn try_new(period: Duration) -> Result<Self, Error> {
-        validate_interval(period)?;
+        validate_period(&period)?;
 
         Ok(Self { interval: Arc::new(Mutex::new(time::interval(period))) })
     }
@@ -78,28 +81,28 @@ impl Countdown {
     ///
     /// * `Ok(watcher)` - The countdown has started, and a [`Watcher`] is returned.
     /// * `Err(err)` - The countdown could not be started.
-    pub async fn start(&mut self, duration: Duration) -> Result<Watcher, Error> {
+    pub async fn start(&mut self, duration: &Duration) -> Result<Watcher, Error> {
         self.validate_duration(duration).await?;
         
-        let (tx, rx) = watch::channel(duration);
+        let (tx, rx) = watch::channel(duration.clone());
         
-        tokio::spawn(countdown(self.interval.clone(), tx, duration));
+        tokio::spawn(countdown(self.interval.clone(), tx, duration.clone()));
 
         Ok(Watcher { rx })
     }
 
-    async fn validate_duration(&self, duration: Duration) -> Result<(), InvalidDuration> {
+    async fn validate_duration(&self, duration: &Duration) -> Result<(), InvalidDuration> {
         if duration.is_zero() {
             return Err(InvalidDuration::ZeroDuration);
         }
     
-        if duration > Duration::from_secs(86_400) {
-            return Err(InvalidDuration::DurationGreaterThanOneDay(duration));
+        if duration > &Duration::from_secs(86_400) {
+            return Err(InvalidDuration::DurationGreaterThanOneDay(duration.clone()));
         }
 
-        let period = self.interval.lock().await.period();
+        let period = &self.interval.lock().await.period();
         if period > duration {
-            return Err(InvalidDuration::DurationSmallerThanInterval{duration, period});
+            return Err(InvalidDuration::DurationSmallerThanPeriod{duration: duration.clone(), period: period.clone()});
         }
     
         Ok(())
@@ -107,13 +110,13 @@ impl Countdown {
 }
 
 async fn countdown(interval: Arc<Mutex<Interval>>, tx: watch::Sender<Duration>, duration: Duration) {
-    let period = interval.lock().await.period();
-    let intervals = calc_intervals(duration, period);
+    let period = &interval.lock().await.period();
+    let intervals = calc_intervals(&duration, period);
 
     for i in (0..=intervals).rev() {
         interval.lock().await.tick().await;
     
-        tx.send(period * i).unwrap();
+        tx.send(period.mul(i).clone()).unwrap();
     }
 }
 
@@ -130,19 +133,19 @@ impl Watcher {
     }
 }
 
-fn validate_interval(interval: Duration) -> Result<(), InvalidCountdown> {
-    if interval.is_zero() {
+fn validate_period(period: &Duration) -> Result<(), InvalidCountdown> {
+    if period.is_zero() {
         return Err(InvalidCountdown::ZeroInterval);
     }
 
-    if interval > Duration::from_secs(3600) {
-        return Err(InvalidCountdown::IntervalGreaterThanOneHour(interval));
+    if period > &Duration::from_secs(3600) {
+        return Err(InvalidCountdown::IntervalGreaterThanOneHour(period.clone()));
     }
 
     Ok(())
 }
 
-fn calc_intervals(duration: Duration, period: Duration) -> u32 {
+fn calc_intervals(duration: &Duration, period: &Duration) -> u32 {
     (duration.as_secs_f64() / period.as_secs_f64()).ceil() as u32
 }
 
@@ -167,21 +170,21 @@ mod tests {
     #[tokio::test]
     async fn should_fail_to_start_a_countdown_given_an_duration_smaller_than_the_interval() {
         let error = Countdown::try_new(Duration::from_secs(2)).expect("unexpected error creating a countdown")
-            .start(Duration::from_secs(1)).await.expect_err("should have failed to start");
-        assert_eq!(error, Error::InvalidDuration(InvalidDuration::DurationSmallerThanInterval{duration: Duration::from_secs(1), period: Duration::from_secs(2)}));
+            .start(&Duration::from_secs(1)).await.expect_err("should have failed to start");
+        assert_eq!(error, Error::InvalidDuration(InvalidDuration::DurationSmallerThanPeriod{duration: Duration::from_secs(1), period: Duration::from_secs(2)}));
     }
 
     #[tokio::test]
     async fn should_fail_to_start_a_countdown_given_a_duration_of_zero() {
         let error = Countdown::try_new(Duration::from_millis(100)).expect("unexpected error creating a countdown")
-            .start(Duration::ZERO).await.expect_err("should have failed to start");
+            .start(&Duration::ZERO).await.expect_err("should have failed to start");
         assert_eq!(error, Error::InvalidDuration(InvalidDuration::ZeroDuration));
     }
 
     #[tokio::test]
     async fn should_fail_to_start_a_countdown_given_a_duration_of_greater_than_one_day() {
         let error = Countdown::try_new(Duration::from_millis(100)).expect("unexpected error creating a countdown")
-            .start(Duration::from_secs(86_401)).await.expect_err("should have failed to start");
+            .start(&Duration::from_secs(86_401)).await.expect_err("should have failed to start");
         assert_eq!(error, Error::InvalidDuration(InvalidDuration::DurationGreaterThanOneDay(Duration::from_secs(86_401))));
     }
 
@@ -191,7 +194,7 @@ mod tests {
         let mut expectations = [1000u16, 900u16, 800u16, 700u16, 600u16, 500u16, 400u16, 300u16, 200u16, 100u16, 0u16].map(|ms| Duration::from_millis(ms.into())).to_vec();
         expectations.reverse();
 
-        let mut watcher = timer.start(Duration::from_secs(1)).await.expect("unexpected countdown failure");
+        let mut watcher = timer.start(&Duration::from_secs(1)).await.expect("unexpected countdown failure");
         while let Some(time_left) = watcher.next().await {
             if let Some(expect) = expectations.pop() {
                 assert_eq!(expect, time_left, "expected {:?}, but got {:?}", expect, time_left);
