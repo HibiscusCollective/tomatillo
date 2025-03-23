@@ -86,12 +86,21 @@ mod tests {
     use crate::countdown::Watcher;
 
     #[tokio::test]
-    async fn should_timeout_if_no_updates_received_for_more_than_1_second() {
+    async fn should_timeout_if_no_updates_received_for_more_than_the_default_timeout_of_1_second() {
         time::pause();
         let (_tx, rx) = watch::channel(42u32);
         
         time::advance(Duration::from_millis(1001)).await;
         assert_eq!(channel!(rx).next().await.expect_err("expected error"), WatcherError::Timeout(Duration::from_millis(1000)).into());
+    }
+
+    #[tokio::test]
+    async fn should_timeout_if_no_updates_received_for_more_than_the_specified_timeout() {
+        time::pause();
+        let (_tx, rx) = watch::channel(42u32);
+        
+        time::advance(Duration::from_millis(501)).await;
+        assert_eq!(channel!(rx, 500).next().await.expect_err("expected error"), WatcherError::Timeout(Duration::from_millis(500)).into());
     }
 
     #[tokio::test]
