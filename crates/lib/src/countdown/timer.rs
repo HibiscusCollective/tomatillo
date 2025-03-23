@@ -9,6 +9,14 @@ use tokio::{
 use super::{watcher::ChannelWatcher, Countdown, Result};
 
 #[derive(Debug, Error, PartialEq)]
+pub enum TimerError {
+    #[error(transparent)]
+    InvalidCountdown(#[from] InvalidCountdown),
+    #[error(transparent)]
+    InvalidDuration(#[from] InvalidDuration),
+}
+
+#[derive(Debug, Error, PartialEq)]
 pub enum InvalidCountdown {
     #[error("Interval cannot be zero")]
     ZeroInterval,
@@ -58,20 +66,18 @@ impl AsyncCountdown {
         Ok(Self { interval: Arc::new(Mutex::new(time::interval(Duration::from_millis(period_millis)))) })
     }
 
-    
-
     async fn validate_duration(&self, duration: u64) -> Result<()> {
         if duration == 0 {
-            return Err(InvalidDuration::ZeroDuration.into());
+            return Err(TimerError::InvalidDuration(InvalidDuration::ZeroDuration).into());
         }
     
         if duration > 86_400 {
-            return Err(InvalidDuration::DurationGreaterThanOneDay(Duration::from_millis(duration)).into());
+            return Err(TimerError::InvalidDuration(InvalidDuration::DurationGreaterThanOneDay(Duration::from_millis(duration))).into());
         }
 
         let period = self.interval.lock().await.period();
         if period > Duration::from_millis(duration) {
-            return Err(InvalidDuration::DurationSmallerThanPeriod{duration: Duration::from_millis(duration), period: period.clone()}.into());
+            return Err(TimerError::InvalidDuration(InvalidDuration::DurationSmallerThanPeriod{duration: Duration::from_millis(duration), period: period.clone()}).into());
         }
     
         Ok(())
@@ -114,11 +120,11 @@ async fn countdown(interval: Arc<Mutex<Interval>>, tx: watch::Sender<u64>, durat
 
 fn validate_period(period: u64) -> Result<()> {
     if period == 0u64 {
-        return Err(InvalidCountdown::ZeroInterval.into());
+        return Err(TimerError::InvalidCountdown(InvalidCountdown::ZeroInterval).into());
     }
 
     if period > 3600 {
-        return Err(InvalidCountdown::IntervalGreaterThanOneHour(Duration::from_millis(period)).into());
+        return Err(TimerError::InvalidCountdown(InvalidCountdown::IntervalGreaterThanOneHour(Duration::from_millis(period))).into());
     }
 
     Ok(())
@@ -139,34 +145,34 @@ mod tests {
     #[tokio::test]
     async fn should_fail_to_create_a_countdown_given_an_interval_of_zero() {
         let error = AsyncCountdown::try_new(0).expect_err("should have failed");
-        assert_eq!(error, InvalidCountdown::ZeroInterval.into());
+        assert_eq!(error, TimerError::InvalidCountdown(InvalidCountdown::ZeroInterval).into());
     }
 
     #[tokio::test]
     async fn should_fail_to_create_a_countdown_given_an_interval_of_greater_than_one_hour() {
         let result = AsyncCountdown::try_new(3601).expect_err("should have failed");
-        assert_eq!(result, InvalidCountdown::IntervalGreaterThanOneHour(Duration::from_millis(3601)).into());
+        assert_eq!(result, TimerError::InvalidCountdown(InvalidCountdown::IntervalGreaterThanOneHour(Duration::from_millis(3601))).into());
     }
 
     #[tokio::test]
     async fn should_fail_to_start_a_countdown_given_an_duration_smaller_than_the_interval() {
         let error = AsyncCountdown::try_new(2000).expect("unexpected error creating a countdown")
             .start(1000).await.expect_err("should have failed to start");
-        assert_eq!(error, InvalidDuration::DurationSmallerThanPeriod{duration: Duration::from_millis(1000), period: Duration::from_millis(2000)}.into());
+        assert_eq!(error, TimerError::InvalidDuration(InvalidDuration::DurationSmallerThanPeriod{duration: Duration::from_millis(1000), period: Duration::from_millis(2000)}).into());
     }
 
     #[tokio::test]
     async fn should_fail_to_start_a_countdown_given_a_duration_of_zero() {
         let error = AsyncCountdown::try_new(100).expect("unexpected error creating a countdown")
             .start(0).await.expect_err("should have failed to start");
-        assert_eq!(error, InvalidDuration::ZeroDuration.into());
+        assert_eq!(error, TimerError::InvalidDuration(InvalidDuration::ZeroDuration).into());
     }
 
     #[tokio::test]
     async fn should_fail_to_start_a_countdown_given_a_duration_of_greater_than_one_day() {
         let error = AsyncCountdown::try_new(100).expect("unexpected error creating a countdown")
             .start(86_401).await.expect_err("should have failed to start");
-        assert_eq!(error, InvalidDuration::DurationGreaterThanOneDay(Duration::from_millis(86_401)).into());
+        assert_eq!(error, TimerError::InvalidDuration(InvalidDuration::DurationGreaterThanOneDay(Duration::from_millis(86_401))).into());
     }
 
     #[tokio::test]
@@ -175,7 +181,8 @@ mod tests {
         let mut expectations = [1000u64, 900u64, 800u64, 700u64, 600u64, 500u64, 400u64, 300u64, 200u64, 100u64, 0u64].iter().rev().cloned().collect::<Vec<_>>();
 
         let mut watcher = timer.start(1000).await.expect("unexpected countdown failure");
-        while let Some(millis_left) = watcher.next().await {
+
+        while let Some(millis_left) = watcher.next().await.expect("unexpected error") {
             if let Some(expect) = expectations.pop() {
                 assert_eq!(expect, millis_left, "expected {:?}, but got {:?}", expect, millis_left);
             } else {

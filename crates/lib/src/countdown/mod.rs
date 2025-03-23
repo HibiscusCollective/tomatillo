@@ -1,25 +1,22 @@
 use thiserror::Error;
 
-use crate::countdown::{
-    timer::{InvalidCountdown, InvalidDuration}, 
-    watcher::Zeroable,
-};
+use crate::countdown::timer::TimerError;
 
 mod timer;
 mod watcher;
 
 pub use timer::AsyncCountdown;
-pub use watcher::ChannelWatcher;
+pub use watcher::{ChannelWatcher, WatcherError, Zeroable};
+
+pub type Result<T> = std::result::Result<T, CountdownError>;
 
 #[derive(Debug, Error, PartialEq)]
-pub enum Error {
+pub enum CountdownError {
     #[error(transparent)]
-    InvalidCountdown(#[from] InvalidCountdown),
+    TimerError(#[from] TimerError),
     #[error(transparent)]
-    InvalidDuration(#[from] InvalidDuration),
+    WatcherError(#[from] WatcherError),
 }
-
-type Result<T> = std::result::Result<T, Error>;
 
 /// A countdown that counts down from a specified duration.
 pub trait Countdown {
@@ -46,5 +43,5 @@ pub trait Watcher<T: Zeroable + Copy> {
     ///
     /// * `Some(value)` - The next value from the countdown.
     /// * `None` - The countdown has completed.
-    fn next(&mut self) -> impl std::future::Future<Output = Option<T>>;
+    fn next(&mut self) -> impl std::future::Future<Output = Result<Option<T>>>;
 }
