@@ -1,12 +1,12 @@
-use std::{ops::Mul, sync::Arc};
+use std::sync::Arc;
 
 use thiserror::Error;
 use tokio::{
-    sync::{watch, Mutex},
+    sync::Mutex,
     time::{self, Duration, Interval},
 };
 
-use super::{watcher::ChannelWatcher, Countdown, Result};
+use super::{channel::{Channel, ChannelReceiver}, Countdown, Result, Sender};
 
 #[derive(Debug, Error, PartialEq)]
 pub enum TimerError {
@@ -37,7 +37,7 @@ pub enum InvalidDuration {
 /// A countdown that counts down from a specified duration.
 #[derive(Debug)]
 pub struct AsyncCountdown {
-    interval: Arc<Mutex<Interval>>,
+    interval: Arc<Mutex<Interval>>
 }
 
 impl Default for AsyncCountdown {
@@ -84,7 +84,7 @@ impl AsyncCountdown {
     }
 }
 
-impl Countdown for AsyncCountdown {
+impl Countdown<u64> for AsyncCountdown {
     /// Starts the countdown.
     ///
     /// # Arguments
@@ -95,27 +95,30 @@ impl Countdown for AsyncCountdown {
     ///
     /// A [`Result`] that is:
     ///
-    /// * `Ok(watcher)` - The countdown has started, and a [`ChannelWatcher`] is returned.
+    /// * `Ok(watcher)` - The countdown has started, and a [`ChannelReceiver`] is returned.
     /// * `Err(err)` - The countdown could not be started.
-    async fn start(&self, duration_millis: u64) -> Result<ChannelWatcher<u64>> {
+    async fn start(&self, duration_millis: u64) -> Result<ChannelReceiver<u64>> {
         self.validate_duration(duration_millis).await?;
         
-        let (tx, rx) = watch::channel(duration_millis);
-        
+        let (tx, rx) = Channel::new(duration_millis);   
         tokio::spawn(countdown(self.interval.clone(), tx, duration_millis));
 
-        Ok(ChannelWatcher::from(rx))
+        Ok(rx)
     }
 }
-async fn countdown(interval: Arc<Mutex<Interval>>, tx: watch::Sender<u64>, duration: u64) {
+
+async fn countdown(interval: Arc<Mutex<Interval>>, tx: impl Sender<u64>, duration: u64) {
     let period = &interval.lock().await.period();
     let intervals = calc_intervals(Duration::from_millis(duration), period);
+    let period_ms = period.as_millis() as u64;
 
-    for i in (0..=intervals).rev() {
+    for i in 0..=intervals {
         interval.lock().await.tick().await;
-    
-        tx.send(period.mul(i).as_millis() as u64).unwrap();
+
+        tx.send(duration - (period_ms * i as u64)).await.expect("unexpected error sending value");
     }
+
+    tx.close().await.expect("unexpected error closing channel");
 }
 
 fn validate_period(period: u64) -> Result<()> {
@@ -138,7 +141,7 @@ fn calc_intervals(duration: Duration, period: &Duration) -> u32 {
 mod tests {
     use tokio::time::Duration;
 
-    use crate::countdown::Watcher;
+    use crate::countdown::{Receiver, Response};
 
     use super::*;
 
@@ -177,17 +180,20 @@ mod tests {
 
     #[tokio::test]
     async fn should_countdown_to_zero() {
-        let timer = AsyncCountdown::try_new(1000).expect("should have created countdown");
+        time::pause();
+        let timer = AsyncCountdown::try_new(100).expect("should have created countdown");
         let mut expectations = [1000u64, 900u64, 800u64, 700u64, 600u64, 500u64, 400u64, 300u64, 200u64, 100u64, 0u64].iter().rev().cloned().collect::<Vec<_>>();
+        let num_expect = expectations.len();
 
-        let mut watcher = timer.start(1000).await.expect("unexpected countdown failure");
+        let rx = timer.start(1000).await.expect("unexpected countdown failure");
 
-        while let Some(millis_left) = watcher.next().await.expect("unexpected error") {
-            if let Some(expect) = expectations.pop() {
-                assert_eq!(expect, millis_left, "expected {:?}, but got {:?}", expect, millis_left);
-            } else {
-                assert!(false, "unexpected time left received: {:?}", millis_left)
+        while let Some(expect) = expectations.pop() {
+            if let Ok(Response::Value(millis_left)) = rx.recv().await {
+                assert_eq!(expect, millis_left, "[{:?}] expected {:?}, but got {:?}", num_expect - expectations.len(), expect, millis_left);
             }
+            time::advance(Duration::from_millis(100u64)).await;
         }
+
+        assert_eq!(expectations.len(), 0, "unmet expectations: {:?}", expectations.iter().rev().collect::<Vec<_>>());
     }
 }

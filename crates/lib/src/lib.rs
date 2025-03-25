@@ -1,26 +1,26 @@
-use std::io::Write;
+use countdown::Countdown;
+use thiserror::Error;
 
-use countdown::{Countdown, Watcher};
-
-pub mod display;
+pub mod view;
 pub mod countdown;
 
+#[derive(Debug, Error, PartialEq)]
+pub enum TomatilloError {
+    #[error(transparent)]
+    CountdownError(#[from] crate::countdown::CountdownError),
+    #[error(transparent)]
+    ChannelError(#[from] crate::countdown::ChannelError),
+}
+
 pub async fn run(
-    timer: impl Countdown,
-    mut writer: impl Write,
+    timer: impl Countdown<u64>,
     duration_millis: u64,
 ) {
-    let mut countdown = timer.start(duration_millis).await.expect("unexpected countdown failure");
-    
-    while let Some(time_left) = countdown.next().await {
-        write!(writer, "{:?}\r", time_left).unwrap();
-    }
+    let mut countdown = timer.start(duration_millis).await.unwrap(); // TODO: Handle error
 }
 
 #[cfg(test)]
 mod tests {
-    use countdown::AsyncCountdown;
-
     use super::*;
 
 //     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
