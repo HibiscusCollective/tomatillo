@@ -126,7 +126,7 @@ fn validate_period(period: u64) -> Result<()> {
         return Err(TimerError::InvalidCountdown(InvalidCountdown::ZeroInterval).into());
     }
 
-    if period > 3600 {
+    if period > 3600 * 1000 {
         return Err(TimerError::InvalidCountdown(InvalidCountdown::IntervalGreaterThanOneHour(Duration::from_millis(period))).into());
     }
 
@@ -145,16 +145,19 @@ mod tests {
 
     use super::*;
 
+    const HOUR_MS: u64 = 60u64 * 60 * 1000;
+    const DAY_MS: u64 = 24u64 * 60 * 60 * 1000;
+
     #[tokio::test]
-    async fn should_fail_to_create_a_countdown_given_an_interval_of_zero() {
+    async fn should_fail_to_create_a_countdown_given_a_period_of_zero() {
         let error = AsyncCountdown::try_new(0).expect_err("should have failed");
         assert_eq!(error, TimerError::InvalidCountdown(InvalidCountdown::ZeroInterval).into());
     }
 
     #[tokio::test]
-    async fn should_fail_to_create_a_countdown_given_an_interval_of_greater_than_one_hour() {
-        let result = AsyncCountdown::try_new(3601).expect_err("should have failed");
-        assert_eq!(result, TimerError::InvalidCountdown(InvalidCountdown::IntervalGreaterThanOneHour(Duration::from_millis(3601))).into());
+    async fn should_fail_to_create_a_countdown_given_a_period_of_greater_than_one_hour() {
+        let result = AsyncCountdown::try_new(HOUR_MS + 1).expect_err("should have failed");
+        assert_eq!(result, TimerError::InvalidCountdown(InvalidCountdown::IntervalGreaterThanOneHour(Duration::from_millis(HOUR_MS + 1))).into());
     }
 
     #[tokio::test]
@@ -174,8 +177,8 @@ mod tests {
     #[tokio::test]
     async fn should_fail_to_start_a_countdown_given_a_duration_of_greater_than_one_day() {
         let error = AsyncCountdown::try_new(100).expect("unexpected error creating a countdown")
-            .start(86_401).await.expect_err("should have failed to start");
-        assert_eq!(error, TimerError::InvalidDuration(InvalidDuration::DurationGreaterThanOneDay(Duration::from_millis(86_401))).into());
+            .start(DAY_MS + 1).await.expect_err("should have failed to start");
+        assert_eq!(error, TimerError::InvalidDuration(InvalidDuration::DurationGreaterThanOneDay(Duration::from_millis(DAY_MS + 1))).into());
     }
 
     #[tokio::test]
