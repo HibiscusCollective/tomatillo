@@ -23,6 +23,7 @@ mod tests {
 
     #[rstest]
     #[case::font_ansi_shadow(font::ANSI_SHADOW, ANSI_SHADOW_ZERO)]
+    #[case::font_templar(font::TEMPLAR, TEMPLAR_ZERO)]
     #[case::font_none(font::NONE, "00:00")]
     fn should_render_timer_at_zero<T: Character>(#[case] _font: impl CharacterSet<T>, #[case] _expected: &str) {
         // let view = View { font: font };
@@ -38,5 +39,11 @@ mod tests {
         ████╔╝██║ ████╔╝██║ ██╗ ████╔╝██║ ████╔╝██║
         ╚██████╔╝ ╚██████╔╝ ╚═╝ ╚██████╔╝ ╚██████╔╝
          ╚═════╝   ╚═════╝       ╚═════╝   ╚═════╝ 
+    ");
+
+    const TEMPLAR_ZERO: &str = indoc!("
+        ┏┓ ┏┓   ┏┓ ┏┓
+        ┃┫ ┃┫ • ┃┫ ┃┫
+        ┗┛ ┗┛ • ┗┛ ┗┛
     ");
 }

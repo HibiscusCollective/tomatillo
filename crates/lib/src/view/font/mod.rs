@@ -1,11 +1,14 @@
 use std::{collections::HashMap, fmt::{Debug, Write}, ops::Range};
 
 use ansi_shadow::AnsiShadow;
+use templar::Templar;
 
 mod ansi_shadow;
+mod templar;
 
 pub const NONE: NoopFont = NoopFont;
 pub const ANSI_SHADOW: AnsiShadow = AnsiShadow;
+pub const TEMPLAR: Templar = Templar;
 
 pub trait CharacterSet<T: Character> {
     fn height_range(&self) -> Range<usize>;
