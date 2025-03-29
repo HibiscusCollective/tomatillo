@@ -160,12 +160,12 @@ const COLON: CompositeChar<HEIGHT> = CompositeChar::new(':', [
 
 pub struct Electronic;
 
-impl CharacterSet<CompositeChar<HEIGHT>> for Electronic {
+impl CharacterSet<&'static CompositeChar<HEIGHT>> for Electronic {
     fn height_range(&self) -> Range<usize> {
         (0..11).into()
     }
 
-    fn get(&self, index: char) -> Option<&CompositeChar<HEIGHT>> {
+    fn get(&self, index: char) -> Option<&'static CompositeChar<HEIGHT>> {
         match index {
             '0' => Some(&ZERO),
             '1' => Some(&ONE),
@@ -182,6 +182,10 @@ impl CharacterSet<CompositeChar<HEIGHT>> for Electronic {
         }
     }
 }
+
+
+#[cfg(test)]
+pub const TEST_NINE: CompositeChar<HEIGHT> = NINE;
 
 #[cfg(test)]
 mod tests {

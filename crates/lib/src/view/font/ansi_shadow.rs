@@ -104,12 +104,12 @@ const COLON: CompositeChar<HEIGHT> = CompositeChar::new(':', [
 
 pub struct AnsiShadow;
 
-impl CharacterSet<CompositeChar<6>> for AnsiShadow {
+impl CharacterSet<&'static CompositeChar<HEIGHT>> for AnsiShadow {
     fn height_range(&self) -> Range<usize> {
         (0..HEIGHT).into()
     }
 
-    fn get(&self, index: char) -> Option<&CompositeChar<HEIGHT>> {
+    fn get(&self, index: char) -> Option<&'static CompositeChar<HEIGHT>> {
         match index {
             '0' => Some(&ZERO),
             '1' => Some(&ONE),
@@ -126,6 +126,9 @@ impl CharacterSet<CompositeChar<6>> for AnsiShadow {
         }
     }
 }
+
+#[cfg(test)]    
+pub const TEST_FOUR: &'static CompositeChar<HEIGHT> = &FOUR;
 
 #[cfg(test)]
 mod tests {

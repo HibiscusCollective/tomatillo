@@ -71,12 +71,15 @@ const COLON: CompositeChar<HEIGHT> = CompositeChar::new(':', [
 
 pub struct Templar;
 
-impl CharacterSet<CompositeChar<HEIGHT>> for Templar {
+#[cfg(test)]
+pub const TEST_COLON: CompositeChar<HEIGHT> = COLON;
+
+impl CharacterSet<&'static CompositeChar<HEIGHT>> for Templar {
     fn height_range(&self) -> Range<usize> {
-        (0..3).into()
+        (0..HEIGHT).into()
     }
 
-    fn get(&self, index: char) -> Option<&CompositeChar<HEIGHT>> {
+    fn get(&self, index: char) -> Option<&'static CompositeChar<HEIGHT>> {
         match index {
             '0' => Some(&ZERO),
             '1' => Some(&ONE),
