@@ -190,18 +190,18 @@ mod tests {
     #[test]
     fn test_character_set() {
         let font = Electronic;
-        assert_eq!(font.height_range(), (0..11).into());
-        assert!(font.get('0').is_some());
-        assert!(font.get('1').is_some());
-        assert!(font.get('2').is_some());
-        assert!(font.get('3').is_some());
-        assert!(font.get('4').is_some());
-        assert!(font.get('5').is_some());
-        assert!(font.get('6').is_some());
-        assert!(font.get('7').is_some());
-        assert!(font.get('8').is_some());
-        assert!(font.get('9').is_some());
-        assert!(font.get(':').is_some());
-        assert!(font.get('a').is_none());
+        assert_eq!(font.height_range(), (0..HEIGHT).into());
+        assert_eq!(font.get('0'), Some(&ZERO));
+        assert_eq!(font.get('1'), Some(&ONE));
+        assert_eq!(font.get('2'), Some(&TWO));
+        assert_eq!(font.get('3'), Some(&THREE));
+        assert_eq!(font.get('4'), Some(&FOUR));
+        assert_eq!(font.get('5'), Some(&FIVE));
+        assert_eq!(font.get('6'), Some(&SIX));
+        assert_eq!(font.get('7'), Some(&SEVEN));
+        assert_eq!(font.get('8'), Some(&EIGHT));
+        assert_eq!(font.get('9'), Some(&NINE));
+        assert_eq!(font.get(':'), Some(&COLON));
+        assert_eq!(font.get('a'), None);
     }
 }

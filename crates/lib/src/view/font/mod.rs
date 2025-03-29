@@ -91,10 +91,10 @@ impl Character for char {
 mod tests {
     use std::collections::HashMap;
 
-    use super::*;
-
     use indoc::indoc;
     use rstest::rstest;
+    
+    use super::*;
 
     #[rstest]
     fn test_retrieve_character() {
