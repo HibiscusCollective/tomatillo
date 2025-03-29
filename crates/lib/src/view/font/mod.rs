@@ -1,13 +1,16 @@
 use std::{collections::HashMap, fmt::{Debug, Write}, ops::Range};
 
 use ansi_shadow::AnsiShadow;
+use electronic::Electronic;
 use templar::Templar;
 
 mod ansi_shadow;
+mod electronic;
 mod templar;
 
 pub const NONE: NoopFont = NoopFont;
 pub const ANSI_SHADOW: AnsiShadow = AnsiShadow;
+pub const ELECTRONIC: Electronic = Electronic;
 pub const TEMPLAR: Templar = Templar;
 
 pub trait CharacterSet<T: Character> {
