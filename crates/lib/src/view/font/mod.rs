@@ -1,5 +1,7 @@
 use std::{collections::HashMap, fmt::{Debug, Write}, ops::Range};
 
+pub const NONE: NoopFont = NoopFont;
+
 pub trait CharacterSet<T: Character> {
     fn height_range(&self) -> Range<usize>;
     fn get(&self, index: char) -> Option<&T>;
