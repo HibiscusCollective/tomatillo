@@ -1,10 +1,10 @@
 use std::ops::Range;
 
-use super::{CharacterSet, CompositeChar};
+use super::{Font, CompositeChar};
 
 const HEIGHT: usize = 11;
 
-const ZERO: CompositeChar<HEIGHT> = CompositeChar::new('0', [
+const ZERO: CompositeChar<HEIGHT> = CompositeChar('0', [
     "  ▄▄▄▄▄▄▄▄▄  ",
     " ▐░░░░░░░░░▌ ",
     "▐░█░█▀▀▀▀▀█░▌",
@@ -18,7 +18,7 @@ const ZERO: CompositeChar<HEIGHT> = CompositeChar::new('0', [
     "  ▀▀▀▀▀▀▀▀▀  ",
 ]);
 
-const ONE: CompositeChar<HEIGHT> = CompositeChar::new('1', [
+const ONE: CompositeChar<HEIGHT> = CompositeChar('1', [
     "    ▄▄▄▄     ",
     "  ▄█░░░░▌    ",
     " ▐░░▌▐░░▌    ",
@@ -32,7 +32,7 @@ const ONE: CompositeChar<HEIGHT> = CompositeChar::new('1', [
     " ▀▀▀▀▀▀▀▀▀▀▀ ",
 ]);
 
-const TWO: CompositeChar<HEIGHT> = CompositeChar::new('2', [
+const TWO: CompositeChar<HEIGHT> = CompositeChar('2', [
     " ▄▄▄▄▄▄▄▄▄▄▄ ",
     "▐░░░░░░░░░░░▌",
     " ▀▀▀▀▀▀▀▀▀█░▌",
@@ -46,7 +46,7 @@ const TWO: CompositeChar<HEIGHT> = CompositeChar::new('2', [
     " ▀▀▀▀▀▀▀▀▀▀▀ ",
 ]);
 
-const THREE: CompositeChar<HEIGHT> = CompositeChar::new('3', [
+const THREE: CompositeChar<HEIGHT> = CompositeChar('3', [
     " ▄▄▄▄▄▄▄▄▄▄▄ ",
     "▐░░░░░░░░░░░▌",
     " ▀▀▀▀▀▀▀▀▀█░▌",
@@ -60,7 +60,7 @@ const THREE: CompositeChar<HEIGHT> = CompositeChar::new('3', [
     " ▀▀▀▀▀▀▀▀▀▀▀ ",
 ]);
 
-const FOUR: CompositeChar<HEIGHT> = CompositeChar::new('4', [
+const FOUR: CompositeChar<HEIGHT> = CompositeChar('4', [
     " ▄         ▄ ",
     "▐░▌       ▐░▌",
     "▐░▌       ▐░▌",
@@ -74,7 +74,7 @@ const FOUR: CompositeChar<HEIGHT> = CompositeChar::new('4', [
     "           ▀ ",
 ]);
 
-const FIVE: CompositeChar<HEIGHT> = CompositeChar::new('5', [
+const FIVE: CompositeChar<HEIGHT> = CompositeChar('5', [
     " ▄▄▄▄▄▄▄▄▄▄▄ ",
     "▐░░░░░░░░░░░▌",
     "▐░█▀▀▀▀▀▀▀▀▀ ",
@@ -88,7 +88,7 @@ const FIVE: CompositeChar<HEIGHT> = CompositeChar::new('5', [
     " ▀▀▀▀▀▀▀▀▀▀▀ ",
 ]);
 
-const SIX: CompositeChar<HEIGHT> = CompositeChar::new('6', [
+const SIX: CompositeChar<HEIGHT> = CompositeChar('6', [
     " ▄▄▄▄▄▄▄▄▄▄▄ ",
     "▐░░░░░░░░░░░▌",
     "▐░█▀▀▀▀▀▀▀▀▀ ",
@@ -102,7 +102,7 @@ const SIX: CompositeChar<HEIGHT> = CompositeChar::new('6', [
     " ▀▀▀▀▀▀▀▀▀▀▀ ",
 ]);
 
-const SEVEN: CompositeChar<HEIGHT> = CompositeChar::new('7', [
+const SEVEN: CompositeChar<HEIGHT> = CompositeChar('7', [
     " ▄▄▄▄▄▄▄▄▄▄ ",
     "▐░░░░░░░░░░▌",
     " ▀▀▀▀▀▀▀█░░▌",
@@ -116,7 +116,7 @@ const SEVEN: CompositeChar<HEIGHT> = CompositeChar::new('7', [
     "  ▀▀        ",
 ]);
 
-const EIGHT: CompositeChar<HEIGHT> = CompositeChar::new('8', [
+const EIGHT: CompositeChar<HEIGHT> = CompositeChar('8', [
     " ▄▄▄▄▄▄▄▄▄▄▄ ",
     "▐░░░░░░░░░░░▌",
     "▐░█▀▀▀▀▀▀▀█░▌",
@@ -130,7 +130,7 @@ const EIGHT: CompositeChar<HEIGHT> = CompositeChar::new('8', [
     " ▀▀▀▀▀▀▀▀▀▀▀ ",
 ]);
 
-const NINE: CompositeChar<HEIGHT> = CompositeChar::new('9', [
+const NINE: CompositeChar<HEIGHT> = CompositeChar('9', [
     " ▄▄▄▄▄▄▄▄▄▄▄ ",
     "▐░░░░░░░░░░░▌",
     "▐░█▀▀▀▀▀▀▀█░▌",
@@ -144,7 +144,7 @@ const NINE: CompositeChar<HEIGHT> = CompositeChar::new('9', [
     " ▀▀▀▀▀▀▀▀▀▀▀ ",
 ]);
 
-const COLON: CompositeChar<HEIGHT> = CompositeChar::new(':', [
+const COLON: CompositeChar<HEIGHT> = CompositeChar(':', [
     "    ",
     "    ",
     "    ",
@@ -160,24 +160,26 @@ const COLON: CompositeChar<HEIGHT> = CompositeChar::new(':', [
 
 pub struct Electronic;
 
-impl CharacterSet<&'static CompositeChar<HEIGHT>> for Electronic {
+impl Font for Electronic {
+    type CHAR = CompositeChar<'static, HEIGHT>;
+
     fn height_range(&self) -> Range<usize> {
-        (0..11).into()
+        (0..HEIGHT).into()
     }
 
-    fn get(&self, index: char) -> Option<&'static CompositeChar<HEIGHT>> {
+    fn get(&self, index: char) -> Option<Self::CHAR> {
         match index {
-            '0' => Some(&ZERO),
-            '1' => Some(&ONE),
-            '2' => Some(&TWO),
-            '3' => Some(&THREE),
-            '4' => Some(&FOUR),
-            '5' => Some(&FIVE),
-            '6' => Some(&SIX),
-            '7' => Some(&SEVEN),
-            '8' => Some(&EIGHT),
-            '9' => Some(&NINE),
-            ':' => Some(&COLON),
+            '0' => Some(ZERO), 
+            '1' => Some(ONE),
+            '2' => Some(TWO),
+            '3' => Some(THREE),
+            '4' => Some(FOUR),
+            '5' => Some(FIVE),
+            '6' => Some(SIX),
+            '7' => Some(SEVEN),
+            '8' => Some(EIGHT),
+            '9' => Some(NINE),
+            ':' => Some(COLON),
             _ => None,
         }
     }
@@ -185,27 +187,47 @@ impl CharacterSet<&'static CompositeChar<HEIGHT>> for Electronic {
 
 
 #[cfg(test)]
-pub const TEST_NINE: CompositeChar<HEIGHT> = NINE;
+pub const TEST_NINE: CompositeChar<'_, HEIGHT> = NINE;
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_character_set() {
+    use rstest::rstest;
+
+    #[rstest]
+    #[case::zero('0', ZERO)]
+    #[case::one('1', ONE)]
+    #[case::two('2', TWO)]
+    #[case::three('3', THREE)]
+    #[case::four('4', FOUR)]
+    #[case::five('5', FIVE)]
+    #[case::six('6', SIX)]
+    #[case::seven('7', SEVEN)]
+    #[case::eight('8', EIGHT)]
+    #[case::nine('9', NINE)]
+    #[case::colon(':', COLON)]
+    fn test_should_return_correct_character<'a>(#[case] key: char, #[case] expected: CompositeChar<'a, HEIGHT>) {
         let font = Electronic;
+
+        if let Some(actual) = font.get(key) {
+            assert_eq!(actual, expected, "expected {key} to map to {expected:?}, but got {actual:?}");
+        } else {
+            assert!(false, "value not found for {key}");
+        }
+    }
+
+    #[test]
+    fn test_should_return_height_range() {
+        let font = Electronic;
+
         assert_eq!(font.height_range(), (0..HEIGHT).into());
-        assert_eq!(font.get('0'), Some(&ZERO));
-        assert_eq!(font.get('1'), Some(&ONE));
-        assert_eq!(font.get('2'), Some(&TWO));
-        assert_eq!(font.get('3'), Some(&THREE));
-        assert_eq!(font.get('4'), Some(&FOUR));
-        assert_eq!(font.get('5'), Some(&FIVE));
-        assert_eq!(font.get('6'), Some(&SIX));
-        assert_eq!(font.get('7'), Some(&SEVEN));
-        assert_eq!(font.get('8'), Some(&EIGHT));
-        assert_eq!(font.get('9'), Some(&NINE));
-        assert_eq!(font.get(':'), Some(&COLON));
+    }
+
+    #[test]
+    fn test_should_return_none_given_key_that_does_not_exist() {
+        let font = Electronic;
+
         assert_eq!(font.get('a'), None);
     }
 }

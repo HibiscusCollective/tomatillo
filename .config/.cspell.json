@@ -112,6 +112,7 @@
 		"rustup",
 		"Rustyline",
 		"sandboxing",
+		"Scanline",
 		"secretlintrc",
 		"Semgrep",
 		"serde",

@@ -13,12 +13,15 @@ pub const ANSI_SHADOW: AnsiShadow = AnsiShadow;
 pub const ELECTRONIC: Electronic = Electronic;
 pub const TEMPLAR: Templar = Templar;
 
-pub trait CharacterSet<T: Character> {
+pub trait Font {
+    type CHAR: Character;
+
     fn height_range(&self) -> Range<usize>;
-    fn get(&self, index: char) -> Option<T>;
+
+    fn get(&self, index: char) -> Option<Self::CHAR>;
 }
 
-pub trait Character: Debug + Eq + PartialEq + ToString {
+pub trait Character: Debug + Eq + PartialEq {
     fn width(&self) -> usize;
     fn height(&self) -> usize;
     
@@ -28,18 +31,11 @@ pub trait Character: Debug + Eq + PartialEq + ToString {
 pub struct NoopFont;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct CompositeChar<const HEIGHT: usize> {
-    id: char,
-    lines: [&'static str; HEIGHT],
-}
+pub struct CompositeChar<'a, const HEIGHT: usize>(char, [&'a str; HEIGHT]);
 
-impl<const HEIGHT: usize> CompositeChar<HEIGHT> {
-    const fn new(id: char, lines: [&'static str; HEIGHT]) -> Self {
-        Self { id, lines }
-    }
-}
+impl Font for NoopFont {
+    type CHAR = char;
 
-impl CharacterSet<char> for NoopFont {
     fn height_range(&self) -> Range<usize> {
         (0..1).into()
     }
@@ -49,7 +45,7 @@ impl CharacterSet<char> for NoopFont {
     }
 }
 
-impl<const HEIGHT: usize> Character for &'static CompositeChar<HEIGHT> {
+impl<'a, const HEIGHT: usize> Character for CompositeChar<'a, HEIGHT> {
     fn width(&self) -> usize {
         todo!()
     }
@@ -59,22 +55,10 @@ impl<const HEIGHT: usize> Character for &'static CompositeChar<HEIGHT> {
     }
 
     fn draw_line(&self, writer: &mut impl Write, line: usize) {
-        write!(writer, "{}", self.lines[line]).unwrap();
+        writer.write_str(self.1[line]).unwrap(); // Handle errors
         if line < HEIGHT-1 {
-            writer.write_char('\n').unwrap();
+            writer.write_char('\n').unwrap(); // Handle errors
         }
-    }
-}
-
-impl<const HEIGHT: usize> ToString for CompositeChar<HEIGHT> {
-    fn to_string(&self) -> String {
-        self.lines.join("\n").to_string()
-    }
-}
-
-impl<const HEIGHT: usize> ToString for &'static CompositeChar<HEIGHT> {
-    fn to_string(&self) -> String {
-        (*self).to_string()
     }
 }
 
@@ -101,7 +85,7 @@ mod tests {
     #[case::ansi_shadow(ANSI_SHADOW, '4', ansi_shadow::TEST_FOUR)]
     #[case::electronic(ELECTRONIC, '9', electronic::TEST_NINE)]
     #[case::templar(TEMPLAR, ':', templar::TEST_COLON)]
-    fn test_retrieve_character<T: Character>(#[case] charset: impl CharacterSet<T>, #[case] index: char, #[case] expected: impl ToString) {
+    fn test_retrieve_character(#[case] charset: impl Font, #[case] index: char, #[case] expected: impl ToString) {
         let actual = charset.get(index).expect("should have found character");
 
         let mut writer = String::new();
@@ -110,5 +94,11 @@ mod tests {
         }
 
         assert_eq!(writer, expected.to_string());
+    }
+
+    impl<const HEIGHT: usize> ToString for CompositeChar<'_, HEIGHT> {  
+        fn to_string(&self) -> String {
+            self.1.join("\n").to_string()
+        }
     }
 }
